@@ -1,0 +1,136 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Student Registration</title>
+
+  <style>
+    * {
+      box-sizing: border-box;
+    }
+
+    body {
+      margin: 0;
+      min-height: 100vh;
+      font-family: Arial, sans-serif;
+      background: linear-gradient(135deg, #1e3c72, #2a5298);
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      padding: 30px;
+    }
+
+    .container {
+      width: 520px;
+      background: #ffffff;
+      border-radius: 18px;
+      padding: 35px;
+      box-shadow: 0 20px 40px rgba(0, 0, 0, 0.25);
+    }
+
+    .header {
+      text-align: center;
+      margin-bottom: 25px;
+    }
+
+    .header h2 {
+      margin: 0;
+      color: #1e3c72;
+      font-size: 30px;
+    }
+
+    .header p {
+      margin-top: 8px;
+      color: #666666;
+      font-size: 14px;
+    }
+
+    label {
+      display: block;
+      font-weight: bold;
+      color: #333333;
+      margin-bottom: 6px;
+    }
+
+    input {
+      width: 100%;
+      padding: 13px;
+      margin-bottom: 18px;
+      border: 1px solid #cccccc;
+      border-radius: 8px;
+      font-size: 15px;
+      outline: none;
+    }
+
+    input:focus {
+      border-color: #2a5298;
+      box-shadow: 0 0 0 3px rgba(42, 82, 152, 0.15);
+    }
+
+    input[type="file"] {
+      padding: 10px;
+      background: #f7f9fc;
+    }
+
+    button {
+      width: 100%;
+      padding: 14px;
+      background: linear-gradient(135deg, #00b09b, #96c93d);
+      color: white;
+      border: none;
+      border-radius: 8px;
+      cursor: pointer;
+      font-size: 17px;
+      font-weight: bold;
+    }
+
+    button:hover {
+      background: linear-gradient(135deg, #009688, #7cb342);
+    }
+
+    .footer {
+      text-align: center;
+      margin-top: 18px;
+      font-size: 13px;
+      color: #777777;
+    }
+  </style>
+</head>
+
+<body>
+  <div class="container">
+
+    <div class="header">
+      <h2>Student Registration</h2>
+      <p>Submit student details and upload resume</p>
+    </div>
+
+    /register
+
+      <label>Student Name</label>
+      <input type="text" name="student_name" placeholder="Enter student name" required>
+
+      <label>Student ID</label>
+      <input type="text" name="student_id" placeholder="Enter student ID" required>
+
+      <label>Contact Number</label>
+      <input type="text" name="contact_no" placeholder="Enter contact number" required>
+
+      <label>Location</label>
+      <input type="text" name="location" placeholder="Enter location" required>
+
+      <label>Resume</label>
+      <input type="file" name="resume" required>
+
+      <button type="submit">Submit Registration</button>
+
+    </form>
+
+    <div class="footer">
+      Student Registration Kubernetes Lab
+    </div>
+
+  </div>
+</body>
+</html>
