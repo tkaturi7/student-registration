@@ -99,6 +99,7 @@
 </head>
 
 <body>
+
   <div class="container">
 
     <div class="header">
@@ -106,22 +107,51 @@
       <p>Submit student details and upload resume</p>
     </div>
 
-    /register
+    <form action="/register" method="POST" enctype="multipart/form-data">
 
-      <label>Student Name</label>
-      <input type="text" name="student_name" placeholder="Enter student name" required>
+      <label for="student_name">Student Name</label>
+      <input
+        type="text"
+        id="student_name"
+        name="student_name"
+        placeholder="Enter student name"
+        required
+      >
 
-      <label>Student ID</label>
-      <input type="text" name="student_id" placeholder="Enter student ID" required>
+      <label for="student_id">Student ID</label>
+      <input
+        type="text"
+        id="student_id"
+        name="student_id"
+        placeholder="Enter student ID"
+        required
+      >
 
-      <label>Contact Number</label>
-      <input type="text" name="contact_no" placeholder="Enter contact number" required>
+      <label for="contact_no">Contact Number</label>
+      <input
+        type="tel"
+        id="contact_no"
+        name="contact_no"
+        placeholder="Enter contact number"
+        required
+      >
 
-      <label>Location</label>
-      <input type="text" name="location" placeholder="Enter location" required>
+      <label for="location">Location</label>
+      <input
+        type="text"
+        id="location"
+        name="location"
+        placeholder="Enter location"
+        required
+      >
 
-      <label>Resume</label>
-      <input type="file" name="resume" required>
+      <label for="resume">Resume</label>
+      <input
+        type="file"
+        id="resume"
+        name="resume"
+        required
+      >
 
       <button type="submit">Submit Registration</button>
 
@@ -132,5 +162,6 @@
     </div>
 
   </div>
+
 </body>
 </html>
