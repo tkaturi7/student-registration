@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Student Registration - PE3 CI/CD Test</title>
+  <title>Student Registration</title>
 
   <style>
     * {
@@ -14,7 +14,7 @@
       margin: 0;
       min-height: 100vh;
       font-family: Arial, sans-serif;
-      background: linear-gradient(135deg, #0f2027, #203a43, #2c5364);
+      background: linear-gradient(135deg, #1e3c72, #2a5298);
       display: flex;
       justify-content: center;
       align-items: center;
@@ -22,102 +22,78 @@
     }
 
     .container {
-      width: 540px;
+      width: 520px;
       background: #ffffff;
-      border-radius: 22px;
-      padding: 38px;
-      box-shadow: 0 25px 50px rgba(0, 0, 0, 0.30);
-      border-top: 8px solid #00b09b;
-    }
-
-    .badge {
-      text-align: center;
-      background: #e8f7f4;
-      color: #00796b;
-      font-weight: bold;
-      padding: 8px 12px;
-      border-radius: 999px;
-      margin-bottom: 20px;
-      font-size: 13px;
+      border-radius: 18px;
+      padding: 35px;
+      box-shadow: 0 20px 40px rgba(0, 0, 0, 0.25);
     }
 
     .header {
       text-align: center;
-      margin-bottom: 28px;
+      margin-bottom: 25px;
     }
 
     .header h2 {
       margin: 0;
-      color: #0f2027;
-      font-size: 32px;
-      letter-spacing: 0.5px;
+      color: #1e3c72;
+      font-size: 30px;
     }
 
     .header p {
-      margin-top: 10px;
+      margin-top: 8px;
       color: #666666;
-      font-size: 15px;
+      font-size: 14px;
     }
 
     label {
       display: block;
       font-weight: bold;
       color: #333333;
-      margin-bottom: 7px;
-      font-size: 14px;
+      margin-bottom: 6px;
     }
 
     input {
       width: 100%;
-      padding: 14px;
+      padding: 13px;
       margin-bottom: 18px;
       border: 1px solid #cccccc;
-      border-radius: 10px;
+      border-radius: 8px;
       font-size: 15px;
       outline: none;
-      transition: 0.2s ease;
     }
 
     input:focus {
-      border-color: #00b09b;
-      box-shadow: 0 0 0 4px rgba(0, 176, 155, 0.15);
+      border-color: #2a5298;
+      box-shadow: 0 0 0 3px rgba(42, 82, 152, 0.15);
     }
 
     input[type="file"] {
-      padding: 11px;
+      padding: 10px;
       background: #f7f9fc;
-      cursor: pointer;
     }
 
     button {
       width: 100%;
-      padding: 15px;
+      padding: 14px;
       background: linear-gradient(135deg, #00b09b, #96c93d);
       color: white;
       border: none;
-      border-radius: 10px;
+      border-radius: 8px;
       cursor: pointer;
       font-size: 17px;
       font-weight: bold;
-      transition: 0.2s ease;
     }
 
     button:hover {
-      transform: translateY(-1px);
       background: linear-gradient(135deg, #009688, #7cb342);
-      box-shadow: 0 10px 20px rgba(0, 176, 155, 0.25);
     }
 
     .footer {
       text-align: center;
-      margin-top: 20px;
+      margin-top: 18px;
       font-size: 13px;
       color: #777777;
-    }
-
-    .footer span {
-      color: #00b09b;
-      font-weight: bold;
     }
   </style>
 </head>
@@ -125,67 +101,34 @@
 <body>
   <div class="container">
 
-    <div class="badge">
-      PE3 GKE CI/CD Test Version
-    </div>
-
     <div class="header">
       <h2>Student Registration</h2>
-      <p>Submit student details and upload resume to Cloud Storage</p>
+      <p>Submit student details and upload resume</p>
     </div>
 
     /register
 
-      <label for="student_name">Student Name</label>
-      <input
-        type="text"
-        id="student_name"
-        name="student_name"
-        placeholder="Enter student name"
-        required
-      >
+      <label>Student Name</label>
+      <input type="text" name="student_name" placeholder="Enter student name" required>
 
-      <label for="student_id">Student ID</label>
-      <input
-        type="text"
-        id="student_id"
-        name="student_id"
-        placeholder="Enter student ID"
-        required
-      >
+      <label>Student ID</label>
+      <input type="text" name="student_id" placeholder="Enter student ID" required>
 
-      <label for="contact_no">Contact Number</label>
-      <input
-        type="text"
-        id="contact_no"
-        name="contact_no"
-        placeholder="Enter contact number"
-        required
-      >
+      <label>Contact Number</label>
+      <input type="text" name="contact_no" placeholder="Enter contact number" required>
 
-      <label for="location">Location</label>
-      <input
-        type="text"
-        id="location"
-        name="location"
-        placeholder="Enter location"
-        required
-      >
+      <label>Location</label>
+      <input type="text" name="location" placeholder="Enter location" required>
 
-      <label for="resume">Resume</label>
-      <input
-        type="file"
-        id="resume"
-        name="resume"
-        required
-      >
+      <label>Resume</label>
+      <input type="file" name="resume" required>
 
       <button type="submit">Submit Registration</button>
 
     </form>
 
     <div class="footer">
-      Student Registration Kubernetes Lab | <span>Updated through GitHub Actions</span>
+      Student Registration Kubernetes Lab
     </div>
 
   </div>
