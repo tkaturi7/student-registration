@@ -1,15 +1,20 @@
 {
   "name": "student-registration",
   "version": "1.0.0",
+  "description": "Student registration application using GKE, Cloud SQL and Cloud Storage",
   "main": "server.js",
   "scripts": {
-    "start": "node server.js"
+    "start": "node server.js",
+    "check": "node --check server.js"
+  },
+  "engines": {
+    "node": ">=20"
   },
   "license": "ISC",
   "dependencies": {
-    "@google-cloud/storage": "^7.16.0",
+    "@google-cloud/storage": "^7.21.0",
     "express": "^5.2.1",
     "multer": "^2.2.0",
-    "mysql2": "^3.22.5"
+    "mysql2": "^3.23.1"
   }
 }

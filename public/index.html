@@ -2,7 +2,12 @@
 <html lang="en">
 <head>
   <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+
+  <meta
+    name="viewport"
+    content="width=device-width, initial-scale=1.0"
+  >
+
   <title>Student Registration</title>
 
   <style>
@@ -13,52 +18,56 @@
     body {
       margin: 0;
       min-height: 100vh;
+      padding: 30px 16px;
       font-family: Arial, sans-serif;
       background: linear-gradient(135deg, #1e3c72, #2a5298);
       display: flex;
       justify-content: center;
       align-items: center;
-      padding: 30px;
     }
 
     .container {
-      width: 520px;
+      width: min(520px, 100%);
+      padding: 35px;
       background: #ffffff;
       border-radius: 18px;
-      padding: 35px;
       box-shadow: 0 20px 40px rgba(0, 0, 0, 0.25);
     }
 
     .header {
-      text-align: center;
       margin-bottom: 25px;
+      text-align: center;
     }
 
-    .header h2 {
+    .header h1 {
       margin: 0;
       color: #1e3c72;
       font-size: 30px;
     }
 
     .header p {
-      margin-top: 8px;
+      margin: 8px 0 0;
       color: #666666;
       font-size: 14px;
     }
 
+    .form-group {
+      margin-bottom: 18px;
+    }
+
     label {
       display: block;
-      font-weight: bold;
-      color: #333333;
       margin-bottom: 6px;
+      color: #333333;
+      font-weight: bold;
     }
 
     input {
       width: 100%;
       padding: 13px;
-      margin-bottom: 18px;
       border: 1px solid #cccccc;
       border-radius: 8px;
+      background: #ffffff;
       font-size: 15px;
       outline: none;
     }
@@ -73,13 +82,20 @@
       background: #f7f9fc;
     }
 
+    .file-help {
+      display: block;
+      margin-top: 7px;
+      color: #666666;
+      font-size: 12px;
+    }
+
     button {
       width: 100%;
       padding: 14px;
-      background: linear-gradient(135deg, #00b09b, #96c93d);
-      color: white;
       border: none;
       border-radius: 8px;
+      background: linear-gradient(135deg, #00b09b, #96c93d);
+      color: #ffffff;
       cursor: pointer;
       font-size: 17px;
       font-weight: bold;
@@ -89,79 +105,229 @@
       background: linear-gradient(135deg, #009688, #7cb342);
     }
 
-    .footer {
-      text-align: center;
+    button:disabled {
+      background: #9ca3af;
+      cursor: wait;
+    }
+
+    .status {
+      display: none;
       margin-top: 18px;
-      font-size: 13px;
+      padding: 12px;
+      border-radius: 8px;
+      font-size: 14px;
+      text-align: center;
+    }
+
+    .status.submitting {
+      display: block;
+      background: #e8f0fe;
+      color: #174ea6;
+    }
+
+    .status.error {
+      display: block;
+      background: #fee2e2;
+      color: #991b1b;
+    }
+
+    .links {
+      margin-top: 18px;
+      text-align: center;
+    }
+
+    .links a {
+      color: #1e3c72;
+      font-weight: bold;
+      text-decoration: none;
+    }
+
+    .links a:hover {
+      text-decoration: underline;
+    }
+
+    .footer {
+      margin-top: 18px;
       color: #777777;
+      font-size: 13px;
+      text-align: center;
+    }
+
+    @media (max-width: 560px) {
+      body {
+        align-items: flex-start;
+        padding: 16px;
+      }
+
+      .container {
+        padding: 24px;
+      }
+
+      .header h1 {
+        font-size: 26px;
+      }
     }
   </style>
 </head>
 
 <body>
+  <main class="container">
+    <header class="header">
+      <h1>Student Registration</h1>
 
-  <div class="container">
+      <p>
+        Submit student details and upload a resume.
+      </p>
+    </header>
 
-    <div class="header">
-      <h2>Student Registration</h2>
-      <p>Submit student details and upload resume</p>
-    </div>
+    /register
+      <div class="form-group">
+        <label for="student_name">
+          Student Name
+        </label>
 
-    <form action="/register" method="POST" enctype="multipart/form-data">
+        <input
+          type="text"
+          id="student_name"
+          name="student_name"
+          placeholder="Enter student name"
+          maxlength="100"
+          required
+        >
+      </div>
 
-      <label for="student_name">Student Name</label>
-      <input
-        type="text"
-        id="student_name"
-        name="student_name"
-        placeholder="Enter student name"
-        required
-      >
+      <div class="form-group">
+        <label for="student_id">
+          Student ID
+        </label>
 
-      <label for="student_id">Student ID</label>
-      <input
-        type="text"
-        id="student_id"
-        name="student_id"
-        placeholder="Enter student ID"
-        required
-      >
+        <input
+          type="text"
+          id="student_id"
+          name="student_id"
+          placeholder="Enter student ID"
+          maxlength="50"
+          required
+        >
+      </div>
 
-      <label for="contact_no">Contact Number</label>
-      <input
-        type="tel"
-        id="contact_no"
-        name="contact_no"
-        placeholder="Enter contact number"
-        required
-      >
+      <div class="form-group">
+        <label for="contact_no">
+          Contact Number
+        </label>
 
-      <label for="location">Location</label>
-      <input
-        type="text"
-        id="location"
-        name="location"
-        placeholder="Enter location"
-        required
-      >
+        <input
+          type="tel"
+          id="contact_no"
+          name="contact_no"
+          placeholder="Enter contact number"
+          maxlength="20"
+          pattern="[0-9+() -]{7,20}"
+          required
+        >
+      </div>
 
-      <label for="resume">Resume</label>
-      <input
-        type="file"
-        id="resume"
-        name="resume"
-        required
-      >
+      <div class="form-group">
+        <label for="location">
+          Location
+        </label>
 
-      <button type="submit">Submit Registration</button>
+        <input
+          type="text"
+          id="location"
+          name="location"
+          placeholder="Enter location"
+          maxlength="100"
+          required
+        >
+      </div>
 
+      <div class="form-group">
+        <label for="resume">
+          Resume
+        </label>
+
+        <input
+          type="file"
+          id="resume"
+          name="resume"
+          accept=".pdf,.doc,.docx,application/pdf,application/msword,application/vnd.openxmlformats-officedocument.wordprocessingml.document"
+          required
+        >
+
+        <span class="file-help">
+          Allowed formats: PDF, DOC and DOCX. Maximum size: 5 MB.
+        </span>
+      </div>
+
+      <button id="submit-button" type="submit">
+        Submit Registration
+      </button>
+
+      <div
+        id="form-status"
+        class="status"
+        role="status"
+        aria-live="polite"
+      ></div>
     </form>
 
-    <div class="footer">
-      Student Registration Kubernetes Lab
+    <div class="links">
+      /students
+        View registered students
+      </a>
     </div>
 
-  </div>
+    <footer class="footer">
+      Student Registration on GKE | Version 2
+    </footer>
+  </main>
 
+  <script>
+    const registrationForm =
+      document.getElementById("registration-form");
+
+    const submitButton =
+      document.getElementById("submit-button");
+
+    const formStatus =
+      document.getElementById("form-status");
+
+    registrationForm.addEventListener("submit", (event) => {
+      if (!registrationForm.checkValidity()) {
+        return;
+      }
+
+      const resumeInput =
+        document.getElementById("resume");
+
+      const selectedFile =
+        resumeInput.files[0];
+
+      const maximumSize =
+        5 * 1024 * 1024;
+
+      if (selectedFile && selectedFile.size > maximumSize) {
+        event.preventDefault();
+
+        formStatus.textContent =
+          "The selected resume exceeds the 5 MB limit.";
+
+        formStatus.className =
+          "status error";
+
+        return;
+      }
+
+      submitButton.disabled = true;
+      submitButton.textContent = "Submitting...";
+
+      formStatus.textContent =
+        "Uploading the resume and saving the student registration...";
+
+      formStatus.className =
+        "status submitting";
+    });
+  </script>
 </body>
 </html>

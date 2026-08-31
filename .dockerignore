@@ -1,5 +1,44 @@
-node_modules
-npm-debug.log
+# Git metadata
 .git
+.gitignore
+
+# GitHub Actions and Kubernetes deployment definitions
 .github
 k8s
+
+# Local dependencies and npm logs
+node_modules
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+
+# Local environment files
+.env
+.env.*
+
+# Sensitive credential files
+*.pem
+*.key
+service-account*.json
+credentials*.json
+application_default_credentials.json
+
+# Local editor and operating-system files
+.vscode
+.idea
+.DS_Store
+Thumbs.db
+
+# Test and coverage output
+coverage
+.nyc_output
+
+# Terraform artifacts, if accidentally placed in this repository
+.terraform
+*.tfstate
+*.tfstate.*
+*.tfplan
+errored.tfstate*
+
+# Documentation not required by the runtime container
+README.md

@@ -1,12 +1,20 @@
 FROM node:20-alpine
 
+ENV NODE_ENV=production
+
 WORKDIR /app
 
-COPY package*.json ./
+COPY package.json package-lock.json ./
 
-RUN npm install --omit=d*v
+RUN npm ci --omit=dev \
+    && npm cache clean --force
 
-COPY . .
+COPY server.js ./
+COPY public ./public
+
+RUN chown -R node:node /app
+
+USER node
 
 EXPOSE 3000
 
