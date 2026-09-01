@@ -1,11 +1,11 @@
-<!DOCTYPE html>
-<html lang="en">
-<head>
-  <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Student Registration</title>
+@@LT@@!DOCTYPE html@@GT@@
+@@LT@@html lang="en"@@GT@@
+@@LT@@head@@GT@@
+  @@LT@@meta charset="UTF-8"@@GT@@
+  @@LT@@meta name="viewport" content="width=device-width, initial-scale=1.0"@@GT@@
+  @@LT@@title@@GT@@Student Registration@@LT@@/title@@GT@@
 
-  <style>
+  @@LT@@style@@GT@@
     * {
       box-sizing: border-box;
     }
@@ -100,82 +100,82 @@
       font-size: 13px;
       color: #777777;
     }
-  </style>
-</head>
+  @@LT@@/style@@GT@@
+@@LT@@/head@@GT@@
 
-<body>
-  <div class="container">
-    <div class="header">
-      <h2>Student Registration</h2>
-      <p>Submit student details and upload a resume.</p>
-    </div>
+@@LT@@body@@GT@@
+  @@LT@@div class="container"@@GT@@
+    @@LT@@div class="header"@@GT@@
+      @@LT@@h2@@GT@@Student Registration@@LT@@/h2@@GT@@
+      @@LT@@p@@GT@@Submit student details and upload a resume.@@LT@@/p@@GT@@
+    @@LT@@/div@@GT@@
 
-    <form
+    @@LT@@form
       id="registration-form"
       action="/register"
       method="POST"
       enctype="multipart/form-data"
-    >
-      <label for="student_name">Student Name</label>
-      <input
+    @@GT@@
+      @@LT@@label for="student_name"@@GT@@Student Name@@LT@@/label@@GT@@
+      @@LT@@input
         type="text"
         id="student_name"
         name="student_name"
         placeholder="Enter student name"
         maxlength="100"
         required
-      >
+      @@GT@@
 
-      <label for="student_id">Student ID</label>
-      <input
+      @@LT@@label for="student_id"@@GT@@Student ID@@LT@@/label@@GT@@
+      @@LT@@input
         type="text"
         id="student_id"
         name="student_id"
         placeholder="Enter student ID"
         maxlength="50"
         required
-      >
+      @@GT@@
 
-      <label for="contact_no">Contact Number</label>
-      <input
+      @@LT@@label for="contact_no"@@GT@@Contact Number@@LT@@/label@@GT@@
+      @@LT@@input
         type="tel"
         id="contact_no"
         name="contact_no"
         placeholder="Enter contact number"
         maxlength="20"
         required
-      >
+      @@GT@@
 
-      <label for="location">Location</label>
-      <input
+      @@LT@@label for="location"@@GT@@Location@@LT@@/label@@GT@@
+      @@LT@@input
         type="text"
         id="location"
         name="location"
         placeholder="Enter location"
         maxlength="100"
         required
-      >
+      @@GT@@
 
-      <label for="resume">Resume</label>
-      <input
+      @@LT@@label for="resume"@@GT@@Resume@@LT@@/label@@GT@@
+      @@LT@@input
         type="file"
         id="resume"
         name="resume"
         accept=".pdf,.doc,.docx"
         required
-      >
+      @@GT@@
 
-      <button id="submit-button" type="submit">
+      @@LT@@button id="submit-button" type="submit"@@GT@@
         Submit Registration
-      </button>
-    </form>
+      @@LT@@/button@@GT@@
+    @@LT@@/form@@GT@@
 
-    <div class="footer">
+    @@LT@@div class="footer"@@GT@@
       Student Registration Kubernetes Lab
-    </div>
-  </div>
+    @@LT@@/div@@GT@@
+  @@LT@@/div@@GT@@
 
-  <script>
+  @@LT@@script@@GT@@
     const form = document.getElementById("registration-form");
     const submitButton = document.getElementById("submit-button");
 
@@ -183,6 +183,6 @@
       submitButton.disabled = true;
       submitButton.textContent = "Submitting...";
     });
-  </script>
-</body>
-</html>
+  @@LT@@/script@@GT@@
+@@LT@@/body@@GT@@
+@@LT@@/html@@GT@@

@@ -12,9 +12,9 @@ RUN npm ci --omit=dev \
 COPY server.js ./
 COPY public ./public
 
-RUN chown -R node:node /app
+RUN chown -R 1000:1000 /app
 
-USER node
+USER 1000:1000
 
 EXPOSE 3000
 
