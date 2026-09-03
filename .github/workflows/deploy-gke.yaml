@@ -1,380 +1,118 @@
-      - name: Verify deployment and capture previous image
-        id: deployment_baseline
+name: Build and deploy tagged release to GKE
+
+on:
+  push:
+    tags:
+      - "v*"
+  workflow_dispatch:
+    inputs:
+      controlled_failure_test:
+        description: "Deploy a nonexistent image and validate automatic rollback"
+        required: true
+        default: false
+        type: boolean
+
+permissions:
+  contents: read
+  id-token: write
+
+concurrency:
+  group: student-registration-production
+  cancel-in-progress: false
+
+env:
+  IMAGE: ${{ vars.GAR_LOCATION }}-docker.pkg.dev/${{ vars.GCP_PROJECT_ID }}/${{ vars.GAR_REPOSITORY }}/student-registration
+
+jobs:
+  deploy:
+    name: Build, push, deploy and validate release
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - name: Check out source
+        uses: actions/checkout@v4
+
+      - name: Validate deployment script
         shell: bash
-        env:
-          NAMESPACE: ${{ vars.K8S_NAMESPACE }}
-          DEPLOYMENT: student-registration
-          CONTAINER: application
         run: |
           set -Eeuo pipefail
+          test -x scripts/deploy-with-rollback.sh
+          bash -n scripts/deploy-with-rollback.sh
 
-          kubectl get deployment "${DEPLOYMENT}" \
-            --namespace="${NAMESPACE}"
+      - name: Validate application source
+        shell: bash
+        run: |
+          set -Eeuo pipefail
+          node --check server.js
+          test -s public/index.html
+          grep -q '<!DOCTYPE html>' public/index.html
+          grep -q 'action="/register"' public/index.html
+          grep -q 'method="POST"' public/index.html
+          grep -q 'enctype="multipart/form-data"' public/index.html
+          grep -q 'Student Registration' public/index.html
 
-          PREVIOUS_IMAGE="$(
-            kubectl get deployment "${DEPLOYMENT}" \
-              --namespace="${NAMESPACE}" \
-              -o jsonpath="{.spec.template.spec.containers[?(@.name=='${CONTAINER}')].image}"
-          )"
+      - name: Authenticate to Google Cloud
+        uses: google-github-actions/auth@v3
+        with:
+          project_id: ${{ vars.GCP_PROJECT_ID }}
+          workload_identity_provider: ${{ vars.WIF_PROVIDER }}
+          service_account: ${{ vars.DEPLOY_SERVICE_ACCOUNT }}
 
-          if [ -z "${PREVIOUS_IMAGE}" ]; then
-            echo "Previous application image could not be determined."
-            exit 1
-          fi
+      - name: Set up Google Cloud CLI
+        uses: google-github-actions/setup-gcloud@v3
 
-          echo "Previous image: ${PREVIOUS_IMAGE}"
-          echo "previous_image=${PREVIOUS_IMAGE}" >> "${GITHUB_OUTPUT}"
+      - name: Configure Docker for Artifact Registry
+        shell: bash
+        run: |
+          set -Eeuo pipefail
+          gcloud auth configure-docker "${{ vars.GAR_LOCATION }}-docker.pkg.dev" --quiet
 
-      - name: Deploy candidate and validate with automatic rollback
+      - name: Build application image
+        if: ${{ github.event_name == 'push' }}
+        shell: bash
+        run: |
+          set -Eeuo pipefail
+          docker build --pull             --tag "${IMAGE}:${GITHUB_SHA}"             --tag "${IMAGE}:${GITHUB_REF_NAME}" .
+
+      - name: Push immutable commit image
+        if: ${{ github.event_name == 'push' }}
+        shell: bash
+        run: docker push "${IMAGE}:${GITHUB_SHA}"
+
+      - name: Push release tag image
+        if: ${{ github.event_name == 'push' }}
+        shell: bash
+        run: docker push "${IMAGE}:${GITHUB_REF_NAME}"
+
+      - name: Get GKE credentials
+        uses: google-github-actions/get-gke-credentials@v3
+        with:
+          cluster_name: ${{ vars.GKE_CLUSTER }}
+          location: ${{ vars.GKE_LOCATION }}
+          project_id: ${{ vars.GCP_PROJECT_ID }}
+
+      - name: Confirm target resources
+        shell: bash
+        run: |
+          set -Eeuo pipefail
+          kubectl get deployment student-registration -n "${{ vars.K8S_NAMESPACE }}"
+          kubectl get service student-registration-service -n "${{ vars.K8S_NAMESPACE }}"
+
+      - name: Deploy, validate and automatically roll back
         shell: bash
         env:
           NAMESPACE: ${{ vars.K8S_NAMESPACE }}
           DEPLOYMENT: student-registration
           CONTAINER: application
           SERVICE: student-registration-service
-          CANDIDATE_IMAGE: ${{ env.IMAGE }}:${{ github.sha }}
-          PREVIOUS_IMAGE: ${{ steps.deployment_baseline.outputs.previous_image }}
+          IMAGE: ${{ env.IMAGE }}
+          NORMAL_IMAGE: ${{ env.IMAGE }}:${{ github.sha }}
+          FAILURE_TEST: ${{ github.event_name == 'workflow_dispatch' && inputs.controlled_failure_test || false }}
+        run: scripts/deploy-with-rollback.sh
+
+      - name: Display final deployment
+        if: ${{ always() }}
+        shell: bash
         run: |
-          set -Eeuo pipefail
-
-          echo "Previous image:  ${PREVIOUS_IMAGE}"
-          echo "Candidate image: ${CANDIDATE_IMAGE}"
-
-          if [ -z "${PREVIOUS_IMAGE}" ]; then
-            echo "Previous image is empty."
-            exit 1
-          fi
-
-          if [ "${PREVIOUS_IMAGE}" = "${CANDIDATE_IMAGE}" ]; then
-            echo "Candidate image is already deployed."
-          fi
-
-          collect_diagnostics() {
-            echo "========================================"
-            echo "DEPLOYMENT DIAGNOSTICS"
-            echo "========================================"
-
-            kubectl get deployment,replicaset,pods,service,endpointslice \
-              --namespace="${NAMESPACE}" \
-              -o wide || true
-
-            echo
-            echo "========================================"
-            echo "DEPLOYMENT DESCRIPTION"
-            echo "========================================"
-
-            kubectl describe deployment "${DEPLOYMENT}" \
-              --namespace="${NAMESPACE}" || true
-
-            echo
-            echo "========================================"
-            echo "RECENT EVENTS"
-            echo "========================================"
-
-            kubectl get events \
-              --namespace="${NAMESPACE}" \
-              --sort-by=".lastTimestamp" || true
-
-            echo
-            echo "========================================"
-            echo "CANDIDATE POD DETAILS"
-            echo "========================================"
-
-            kubectl get pods \
-              --namespace="${NAMESPACE}" \
-              -l app=student-registration \
-              -o json \
-              | jq -r '
-                  .items[]
-                  | [
-                      .metadata.name,
-                      .status.phase,
-                      (
-                        [
-                          .status.containerStatuses[]?
-                          | .name
-                            + "="
-                            + (
-                                if .ready
-                                then "ready"
-                                else "not-ready"
-                                end
-                              )
-                            + ",restarts="
-                            + (.restartCount | tostring)
-                        ]
-                        | join(";")
-                      )
-                    ]
-                  | @tsv
-                ' || true
-
-            kubectl get pods \
-              --namespace="${NAMESPACE}" \
-              -l app=student-registration \
-              -o name \
-              | while read -r pod; do
-                  echo
-                  echo "----- ${pod}: application logs -----"
-                  kubectl logs "${pod}" \
-                    --namespace="${NAMESPACE}" \
-                    --container=application \
-                    --tail=100 || true
-
-                  echo
-                  echo "----- ${pod}: proxy logs -----"
-                  kubectl logs "${pod}" \
-                    --namespace="${NAMESPACE}" \
-                    --container=cloud-sql-auth-proxy \
-                    --tail=100 || true
-                done
-          }
-
-          restore_previous_image() {
-            echo "========================================"
-            echo "ROLLBACK STARTED"
-            echo "========================================"
-
-            echo "Restoring exact previous image:"
-            echo "${PREVIOUS_IMAGE}"
-
-            kubectl set image \
-              deployment/"${DEPLOYMENT}" \
-              "${CONTAINER}=${PREVIOUS_IMAGE}" \
-              --namespace="${NAMESPACE}"
-
-            kubectl rollout status \
-              deployment/"${DEPLOYMENT}" \
-              --namespace="${NAMESPACE}" \
-              --timeout=600s
-
-            RESTORED_IMAGE="$(
-              kubectl get deployment "${DEPLOYMENT}" \
-                --namespace="${NAMESPACE}" \
-                -o jsonpath="{.spec.template.spec.containers[?(@.name=='${CONTAINER}')].image}"
-            )"
-
-            echo "Expected restored image: ${PREVIOUS_IMAGE}"
-            echo "Actual restored image:   ${RESTORED_IMAGE}"
-
-            if [ "${RESTORED_IMAGE}" != "${PREVIOUS_IMAGE}" ]; then
-              echo "Rollback verification failed: image mismatch."
-              return 1
-            fi
-
-            DESIRED_REPLICAS="$(
-              kubectl get deployment "${DEPLOYMENT}" \
-                --namespace="${NAMESPACE}" \
-                -o jsonpath="{.spec.replicas}"
-            )"
-
-            READY_REPLICAS="$(
-              kubectl get deployment "${DEPLOYMENT}" \
-                --namespace="${NAMESPACE}" \
-                -o jsonpath="{.status.readyReplicas}"
-            )"
-
-            UPDATED_REPLICAS="$(
-              kubectl get deployment "${DEPLOYMENT}" \
-                --namespace="${NAMESPACE}" \
-                -o jsonpath="{.status.updatedReplicas}"
-            )"
-
-            AVAILABLE_REPLICAS="$(
-              kubectl get deployment "${DEPLOYMENT}" \
-                --namespace="${NAMESPACE}" \
-                -o jsonpath="{.status.availableReplicas}"
-            )"
-
-            echo "Desired replicas:   ${DESIRED_REPLICAS:-0}"
-            echo "Ready replicas:     ${READY_REPLICAS:-0}"
-            echo "Updated replicas:   ${UPDATED_REPLICAS:-0}"
-            echo "Available replicas: ${AVAILABLE_REPLICAS:-0}"
-
-            if [ "${READY_REPLICAS:-0}" -ne "${DESIRED_REPLICAS}" ]; then
-              echo "Rollback verification failed: ready replica mismatch."
-              return 1
-            fi
-
-            if [ "${UPDATED_REPLICAS:-0}" -ne "${DESIRED_REPLICAS}" ]; then
-              echo "Rollback verification failed: updated replica mismatch."
-              return 1
-            fi
-
-            if [ "${AVAILABLE_REPLICAS:-0}" -ne "${DESIRED_REPLICAS}" ]; then
-              echo "Rollback verification failed: available replica mismatch."
-              return 1
-            fi
-
-            echo "Rollback completed and verified."
-          }
-
-          fail_release() {
-            FAILURE_REASON="$1"
-
-            echo "Candidate release failed: ${FAILURE_REASON}"
-
-            collect_diagnostics
-
-            if restore_previous_image; then
-              echo "Application recovery succeeded."
-              echo "The candidate release remains failed."
-              exit 1
-            else
-              echo "CRITICAL: Candidate failed and rollback verification failed."
-              exit 2
-            fi
-          }
-
-          echo "Updating Deployment to candidate image."
-
-          if ! kubectl set image \
-            deployment/"${DEPLOYMENT}" \
-            "${CONTAINER}=${CANDIDATE_IMAGE}" \
-            --namespace="${NAMESPACE}"; then
-            fail_release "kubectl set image failed"
-          fi
-
-          echo "Waiting for candidate rollout."
-
-          if ! kubectl rollout status \
-            deployment/"${DEPLOYMENT}" \
-            --namespace="${NAMESPACE}" \
-            --timeout=360s; then
-            fail_release "rollout did not complete within 360 seconds"
-          fi
-
-          LIVE_IMAGE="$(
-            kubectl get deployment "${DEPLOYMENT}" \
-              --namespace="${NAMESPACE}" \
-              -o jsonpath="{.spec.template.spec.containers[?(@.name=='${CONTAINER}')].image}"
-          )"
-
-          if [ "${LIVE_IMAGE}" != "${CANDIDATE_IMAGE}" ]; then
-            fail_release "Deployment image does not match candidate image"
-          fi
-
-          DESIRED_REPLICAS="$(
-            kubectl get deployment "${DEPLOYMENT}" \
-              --namespace="${NAMESPACE}" \
-              -o jsonpath="{.spec.replicas}"
-          )"
-
-          READY_REPLICAS="$(
-            kubectl get deployment "${DEPLOYMENT}" \
-              --namespace="${NAMESPACE}" \
-              -o jsonpath="{.status.readyReplicas}"
-          )"
-
-          UPDATED_REPLICAS="$(
-            kubectl get deployment "${DEPLOYMENT}" \
-              --namespace="${NAMESPACE}" \
-              -o jsonpath="{.status.updatedReplicas}"
-          )"
-
-          AVAILABLE_REPLICAS="$(
-            kubectl get deployment "${DEPLOYMENT}" \
-              --namespace="${NAMESPACE}" \
-              -o jsonpath="{.status.availableReplicas}"
-          )"
-
-          echo "Desired replicas:   ${DESIRED_REPLICAS:-0}"
-          echo "Ready replicas:     ${READY_REPLICAS:-0}"
-          echo "Updated replicas:   ${UPDATED_REPLICAS:-0}"
-          echo "Available replicas: ${AVAILABLE_REPLICAS:-0}"
-
-          if [ "${READY_REPLICAS:-0}" -ne "${DESIRED_REPLICAS}" ]; then
-            fail_release "ready replicas do not match desired replicas"
-          fi
-
-          if [ "${UPDATED_REPLICAS:-0}" -ne "${DESIRED_REPLICAS}" ]; then
-            fail_release "updated replicas do not match desired replicas"
-          fi
-
-          if [ "${AVAILABLE_REPLICAS:-0}" -ne "${DESIRED_REPLICAS}" ]; then
-            fail_release "available replicas do not match desired replicas"
-          fi
-
-          echo "Removing any previous smoke-test Pod."
-
-          kubectl delete pod release-smoke-test \
-            --namespace="${NAMESPACE}" \
-            --ignore-not-found=true \
-            --wait=true
-
-          echo "Running in-cluster Service smoke tests."
-
-          if ! kubectl run release-smoke-test \
-            --namespace="${NAMESPACE}" \
-            --image="curlimages/curl:8.16.0" \
-            --restart=Never \
-            --rm \
-            --attach \
-            --command -- \
-            sh -ec "
-              curl --fail --silent --show-error \
-                --connect-timeout 10 \
-                --max-time 30 \
-                http://${SERVICE}/health
-
-              curl --fail --silent --show-error \
-                --connect-timeout 10 \
-                --max-time 30 \
-                http://${SERVICE}/healthz
-
-              curl --fail --silent --show-error \
-                --connect-timeout 10 \
-                --max-time 30 \
-                http://${SERVICE}/readyz
-
-              curl --fail --silent --show-error \
-                --connect-timeout 10 \
-                --max-time 30 \
-                http://${SERVICE}/ \
-                | grep -q 'Student Registration'
-            "; then
-            fail_release "in-cluster HTTP smoke tests failed"
-          fi
-
-          NON_READY_CONTAINERS="$(
-            kubectl get pods \
-              --namespace="${NAMESPACE}" \
-              -l app=student-registration \
-              -o json \
-              | jq '[
-                  .items[].status.containerStatuses[]?
-                  | select(.ready != true)
-                ] | length'
-          )"
-
-          RESTART_COUNT="$(
-            kubectl get pods \
-              --namespace="${NAMESPACE}" \
-              -l app=student-registration \
-              -o json \
-              | jq '[
-                  .items[].status.containerStatuses[]?
-                  | .restartCount
-                ] | add // 0'
-          )"
-
-          echo "Non-ready containers: ${NON_READY_CONTAINERS}"
-          echo "Total restart count:   ${RESTART_COUNT}"
-
-          if [ "${NON_READY_CONTAINERS}" -ne 0 ]; then
-            fail_release "one or more containers are not Ready"
-          fi
-
-          if [ "${RESTART_COUNT}" -ne 0 ]; then
-            fail_release "one or more candidate containers restarted"
-          fi
-
-          echo "========================================"
-          echo "RELEASE VALIDATION PASSED"
-          echo "========================================"
-
-          echo "Candidate image: ${CANDIDATE_IMAGE}"
-
-          kubectl get deployment,replicaset,pods,endpointslice \
-            --namespace="${NAMESPACE}" \
-            -o wide
+          set +e
+          kubectl get deployment,replicaset,pods,service,endpointslice             -n "${{ vars.K8S_NAMESPACE }}" -o wide
