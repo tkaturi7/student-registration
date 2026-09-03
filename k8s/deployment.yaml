@@ -6,133 +6,113 @@ metadata:
   labels:
     app: student-registration
 spec:
-  replicas: 1
+  replicas: 2
   revisionHistoryLimit: 5
-
   strategy:
     type: RollingUpdate
     rollingUpdate:
-      maxUnavailable: 0
       maxSurge: 1
-
+      maxUnavailable: 0
   selector:
     matchLabels:
       app: student-registration
-
   template:
     metadata:
       labels:
         app: student-registration
-
     spec:
       serviceAccountName: student-app-ksa
-
       nodeSelector:
         workload: student-app
-
       containers:
-        - name: application
-          image: asia-south1-docker.pkg.dev/pe3-devops-training-tkaturi/pe3-app-images/student-registration:manual-v1
-          imagePullPolicy: Always
-
-          ports:
-            - name: http
-              containerPort: 3000
-              protocol: TCP
-
-          env:
-            - name: PORT
-              value: "3000"
-
-            - name: DB_HOST
-              value: "127.0.0.1"
-
-            - name: DB_PORT
-              value: "3306"
-
-            - name: DB_NAME
-              value: "studentdb"
-
-            - name: GCS_BUCKET_NAME
-              value: "pe3-teja-student-trn-files-870472427005"
-
-            - name: DB_USER
-              valueFrom:
-                secretKeyRef:
-                  name: student-db-credentials
-                  key: DB_USER
-
-            - name: DB_PASSWORD
-              valueFrom:
-                secretKeyRef:
-                  name: student-db-credentials
-                  key: DB_PASSWORD
-
-          startupProbe:
-            httpGet:
-              path: /health
-              port: http
-            periodSeconds: 10
-            timeoutSeconds: 5
-            failureThreshold: 30
-
-          readinessProbe:
-            httpGet:
-              path: /readyz
-              port: http
-            periodSeconds: 10
-            timeoutSeconds: 5
-            failureThreshold: 6
-
-          livenessProbe:
-            httpGet:
-              path: /healthz
-              port: http
-            periodSeconds: 20
-            timeoutSeconds: 5
-            failureThreshold: 3
-
-          resources:
-            requests:
-              cpu: "100m"
-              memory: "128Mi"
-            limits:
-              cpu: "500m"
-              memory: "512Mi"
-
-          securityContext:
-            runAsNonRoot: true
-            runAsUser: 1000
-            runAsGroup: 1000
-            allowPrivilegeEscalation: false
-            capabilities:
-              drop:
-                - ALL
-
-        - name: cloud-sql-auth-proxy
-          image: gcr.io/cloud-sql-connectors/cloud-sql-proxy:2.25.2
-          imagePullPolicy: IfNotPresent
-
-          args:
-            - "--structured-logs"
-            - "--private-ip"
-            - "--address=127.0.0.1"
-            - "--port=3306"
-            - "pe3-devops-training-tkaturi:asia-south1:pe3-teja-student-trn-mysql"
-
-          resources:
-            requests:
-              cpu: "50m"
-              memory: "64Mi"
-            limits:
-              cpu: "250m"
-              memory: "256Mi"
-
-          securityContext:
-            runAsNonRoot: true
-            runAsUser: 1000
-            runAsGroup: 1000
-            allowPrivilegeEscalation: false
-            capabilities:
-              drop:
-                - ALL
+      - name: application
+        image: asia-south1-docker.pkg.dev/pe3-devops-training-tkaturi/pe3-app-images/student-registration:manual-v1
+        imagePullPolicy: Always
+        ports:
+        - name: http
+          containerPort: 3000
+          protocol: TCP
+        env:
+        - name: PORT
+          value: '3000'
+        - name: DB_HOST
+          value: 127.0.0.1
+        - name: DB_PORT
+          value: '3306'
+        - name: DB_NAME
+          value: studentdb
+        - name: GCS_BUCKET_NAME
+          value: pe3-teja-student-trn-files-870472427005
+        - name: DB_USER
+          valueFrom:
+            secretKeyRef:
+              name: student-db-credentials
+              key: DB_USER
+        - name: DB_PASSWORD
+          valueFrom:
+            secretKeyRef:
+              name: student-db-credentials
+              key: DB_PASSWORD
+        startupProbe:
+          httpGet:
+            path: /health
+            port: http
+          periodSeconds: 10
+          timeoutSeconds: 5
+          failureThreshold: 30
+        readinessProbe:
+          httpGet:
+            path: /readyz
+            port: http
+          periodSeconds: 10
+          timeoutSeconds: 5
+          failureThreshold: 6
+        livenessProbe:
+          httpGet:
+            path: /healthz
+            port: http
+          periodSeconds: 20
+          timeoutSeconds: 5
+          failureThreshold: 3
+        resources:
+          requests:
+            cpu: 100m
+            memory: 128Mi
+          limits:
+            cpu: 500m
+            memory: 512Mi
+        securityContext:
+          runAsNonRoot: true
+          runAsUser: 1000
+          runAsGroup: 1000
+          allowPrivilegeEscalation: false
+          capabilities:
+            drop:
+            - ALL
+      - name: cloud-sql-auth-proxy
+        image: gcr.io/cloud-sql-connectors/cloud-sql-proxy:2.25.2
+        imagePullPolicy: IfNotPresent
+        args:
+        - --structured-logs
+        - --private-ip
+        - --address=127.0.0.1
+        - --port=3306
+        - pe3-devops-training-tkaturi:asia-south1:pe3-teja-student-trn-mysql
+        resources:
+          requests:
+            cpu: 50m
+            memory: 64Mi
+          limits:
+            cpu: 250m
+            memory: 256Mi
+        securityContext:
+          runAsNonRoot: true
+          runAsUser: 1000
+          runAsGroup: 1000
+          allowPrivilegeEscalation: false
+          capabilities:
+            drop:
+            - ALL
+      terminationGracePeriodSeconds: 10
+  minReadySeconds: 0
+  progressDeadlineSeconds: 300
