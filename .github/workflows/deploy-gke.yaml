@@ -4,13 +4,6 @@ on:
   push:
     tags:
       - "v*"
-  workflow_dispatch:
-    inputs:
-      controlled_failure_test:
-        description: "Deploy a nonexistent image and validate automatic rollback"
-        required: true
-        default: false
-        type: boolean
 
 permissions:
   contents: read
@@ -25,31 +18,31 @@ env:
 
 jobs:
   deploy:
-    name: Build, push, deploy and validate release
+    name: Build, push and deploy tagged release
     runs-on: ubuntu-latest
-    timeout-minutes: 30
+
     steps:
-      - name: Check out source
+      - name: Check out tagged source
         uses: actions/checkout@v4
 
-      - name: Validate deployment script
+      - name: Validate release tag
         shell: bash
         run: |
-          set -Eeuo pipefail
-          test -x scripts/deploy-with-rollback.sh
-          bash -n scripts/deploy-with-rollback.sh
+          set -euo pipefail
 
-      - name: Validate application source
-        shell: bash
-        run: |
-          set -Eeuo pipefail
-          node --check server.js
-          test -s public/index.html
-          grep -q '<!DOCTYPE html>' public/index.html
-          grep -q 'action="/register"' public/index.html
-          grep -q 'method="POST"' public/index.html
-          grep -q 'enctype="multipart/form-data"' public/index.html
-          grep -q 'Student Registration' public/index.html
+          if [[ "${GITHUB_REF_TYPE}" != "tag" ]]; then
+            echo "This workflow must run from a Git tag."
+            exit 1
+          fi
+
+          if [[ ! "${GITHUB_REF_NAME}" =~ ^v[0-9]+([.][0-9]+){0,2}$ ]]; then
+            echo "Invalid release tag: ${GITHUB_REF_NAME}"
+            echo "Expected examples: v3, v3.1, v3.1.0"
+            exit 1
+          fi
+
+          echo "Release tag: ${GITHUB_REF_NAME}"
+          echo "Commit SHA: ${GITHUB_SHA}"
 
       - name: Authenticate to Google Cloud
         uses: google-github-actions/auth@v3
@@ -64,25 +57,30 @@ jobs:
       - name: Configure Docker for Artifact Registry
         shell: bash
         run: |
-          set -Eeuo pipefail
-          gcloud auth configure-docker "${{ vars.GAR_LOCATION }}-docker.pkg.dev" --quiet
+          set -euo pipefail
+
+          gcloud auth configure-docker             "${{ vars.GAR_LOCATION }}-docker.pkg.dev"             --quiet
 
       - name: Build application image
-        if: ${{ github.event_name == 'push' }}
         shell: bash
         run: |
-          set -Eeuo pipefail
-          docker build --pull             --tag "${IMAGE}:${GITHUB_SHA}"             --tag "${IMAGE}:${GITHUB_REF_NAME}" .
+          set -euo pipefail
+
+          docker build             --pull             --tag "${IMAGE}:${GITHUB_SHA}"             --tag "${IMAGE}:${GITHUB_REF_NAME}"             .
 
       - name: Push immutable commit image
-        if: ${{ github.event_name == 'push' }}
         shell: bash
-        run: docker push "${IMAGE}:${GITHUB_SHA}"
+        run: |
+          set -euo pipefail
 
-      - name: Push release tag image
-        if: ${{ github.event_name == 'push' }}
+          docker push "${IMAGE}:${GITHUB_SHA}"
+
+      - name: Push release image
         shell: bash
-        run: docker push "${IMAGE}:${GITHUB_REF_NAME}"
+        run: |
+          set -euo pipefail
+
+          docker push "${IMAGE}:${GITHUB_REF_NAME}"
 
       - name: Get GKE credentials
         uses: google-github-actions/get-gke-credentials@v3
@@ -91,28 +89,50 @@ jobs:
           location: ${{ vars.GKE_LOCATION }}
           project_id: ${{ vars.GCP_PROJECT_ID }}
 
-      - name: Confirm target resources
+      - name: Confirm target Deployment exists
         shell: bash
         run: |
-          set -Eeuo pipefail
-          kubectl get deployment student-registration -n "${{ vars.K8S_NAMESPACE }}"
-          kubectl get service student-registration-service -n "${{ vars.K8S_NAMESPACE }}"
+          set -euo pipefail
 
-      - name: Deploy, validate and automatically roll back
-        shell: bash
-        env:
-          NAMESPACE: ${{ vars.K8S_NAMESPACE }}
-          DEPLOYMENT: student-registration
-          CONTAINER: application
-          SERVICE: student-registration-service
-          IMAGE: ${{ env.IMAGE }}
-          NORMAL_IMAGE: ${{ env.IMAGE }}:${{ github.sha }}
-          FAILURE_TEST: ${{ github.event_name == 'workflow_dispatch' && inputs.controlled_failure_test || false }}
-        run: scripts/deploy-with-rollback.sh
+          kubectl get deployment student-registration             --namespace="${{ vars.K8S_NAMESPACE }}"
 
-      - name: Display final deployment
-        if: ${{ always() }}
+      - name: Deploy immutable commit image
         shell: bash
         run: |
-          set +e
-          kubectl get deployment,replicaset,pods,service,endpointslice             -n "${{ vars.K8S_NAMESPACE }}" -o wide
+          set -euo pipefail
+
+          kubectl set image             deployment/student-registration             application="${IMAGE}:${GITHUB_SHA}"             --namespace="${{ vars.K8S_NAMESPACE }}"
+
+      - name: Wait for rollout
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          if ! kubectl rollout status             deployment/student-registration             --namespace="${{ vars.K8S_NAMESPACE }}"             --timeout=600s; then
+
+            echo "Rollout failed. Displaying diagnostics."
+
+            kubectl get pods               --namespace="${{ vars.K8S_NAMESPACE }}"               -o wide
+
+            kubectl describe deployment student-registration               --namespace="${{ vars.K8S_NAMESPACE }}"
+
+            kubectl logs               deployment/student-registration               --namespace="${{ vars.K8S_NAMESPACE }}"               --container=application               --tail=100 || true
+
+            kubectl logs               deployment/student-registration               --namespace="${{ vars.K8S_NAMESPACE }}"               --container=cloud-sql-auth-proxy               --tail=100 || true
+
+            exit 1
+          fi
+
+      - name: Display deployed release
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          echo "Release tag: ${GITHUB_REF_NAME}"
+          echo "Commit SHA: ${GITHUB_SHA}"
+
+          echo -n "Deployed image: "
+
+          kubectl get deployment student-registration             --namespace="${{ vars.K8S_NAMESPACE }}"             -o jsonpath='{.spec.template.spec.containers[?(@.name=="application")].image}'
+
+          echo
