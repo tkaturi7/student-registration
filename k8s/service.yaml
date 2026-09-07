@@ -3,14 +3,10 @@ kind: Service
 metadata:
   name: student-registration-service
   namespace: student-app
-  labels:
-    app: student-registration
 spec:
-  type: ClusterIP
-
+  type: LoadBalancer
   selector:
     app: student-registration
-
   ports:
     - name: http
       protocol: TCP

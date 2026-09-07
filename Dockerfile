@@ -1,21 +1,9 @@
-FROM node:20-alpine
-
-ENV NODE_ENV=production
-
+FROM node:22-alpine
 WORKDIR /app
-
 COPY package.json package-lock.json ./
-
-RUN npm ci --omit=dev \
-    && npm cache clean --force
-
+RUN npm ci --omit=dev
 COPY server.js ./
 COPY public ./public
-
-RUN chown -R 1000:1000 /app
-
-USER 1000:1000
-
+USER node
 EXPOSE 3000
-
-CMD ["npm", "start"]
+CMD ["node", "server.js"]

@@ -1,48 +1,172 @@
-name: Build and deploy tagged release to GKE
+name: Build, ZAP scan and deploy to GKE
 
 on:
   push:
-    tags:
-      - "v*"
+    branches:
+      - main
 
 permissions:
   contents: read
   id-token: write
 
 concurrency:
-  group: student-registration-production
+  group: student-registration-zap-lab
   cancel-in-progress: false
 
 env:
   IMAGE: ${{ vars.GAR_LOCATION }}-docker.pkg.dev/${{ vars.GCP_PROJECT_ID }}/${{ vars.GAR_REPOSITORY }}/student-registration
 
 jobs:
-  deploy:
-    name: Build, push and deploy tagged release
+  security-gated-deployment:
+    name: Build, scan and deploy
     runs-on: ubuntu-latest
+    timeout-minutes: 35
+
+    services:
+      mysql:
+        image: mysql:8.0
+        env:
+          MYSQL_ROOT_PASSWORD: root-password
+          MYSQL_DATABASE: studentdb
+          MYSQL_USER: appuser
+          MYSQL_PASSWORD: app-password
+        ports:
+          - 3306:3306
+        options: >-
+          --health-cmd="mysqladmin ping -h 127.0.0.1 -uroot -proot-password"
+          --health-interval=10s
+          --health-timeout=5s
+          --health-retries=12
 
     steps:
-      - name: Check out tagged source
+      - name: Check out source
         uses: actions/checkout@v4
 
-      - name: Validate release tag
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+          cache: npm
+
+      - name: Validate source
+        shell: bash
+        run: |
+          set -euo pipefail
+          npm ci
+          npm test
+
+      - name: Build candidate image
         shell: bash
         run: |
           set -euo pipefail
 
-          if [[ "${GITHUB_REF_TYPE}" != "tag" ]]; then
-            echo "This workflow must run from a Git tag."
+          docker build \
+            --pull \
+            --tag "${IMAGE}:${GITHUB_SHA}" \
+            .
+
+      - name: Start candidate application
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          docker run \
+            --detach \
+            --name candidate \
+            --network host \
+            --env PORT=3000 \
+            --env DB_HOST=127.0.0.1 \
+            --env DB_PORT=3306 \
+            --env DB_NAME=studentdb \
+            --env DB_USER=appuser \
+            --env DB_PASSWORD=app-password \
+            --env GCS_BUCKET_NAME=runner-placeholder \
+            "${IMAGE}:${GITHUB_SHA}"
+
+          for attempt in $(seq 1 36); do
+            if curl --fail --silent \
+              "http://127.0.0.1:3000/readyz"; then
+              echo
+              echo "Candidate application is ready."
+              exit 0
+            fi
+
+            echo "Waiting for candidate application, attempt ${attempt}/36"
+            sleep 5
+          done
+
+          echo "Candidate application did not become ready."
+          docker logs candidate
+          exit 1
+
+      - name: Run OWASP ZAP baseline security gate
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          mkdir -p zap-reports
+          chmod 777 zap-reports
+
+          set +e
+
+          docker run \
+            --rm \
+            --network host \
+            --volume "${PWD}/zap-reports:/zap/wrk:rw" \
+            ghcr.io/zaproxy/zaproxy:stable \
+            zap-baseline.py \
+            -t "http://127.0.0.1:3000" \
+            -m 2 \
+            -I \
+            -r zap-report.html \
+            -J zap-report.json \
+            -x zap-report.xml \
+            -w zap-report.md
+
+          zap_exit_code="$?"
+
+          set -e
+
+          if [ ! -f zap-reports/zap-report.json ]; then
+            echo "ZAP JSON report was not created."
             exit 1
           fi
 
-          if [[ ! "${GITHUB_REF_NAME}" =~ ^v[0-9]+([.][0-9]+){0,2}$ ]]; then
-            echo "Invalid release tag: ${GITHUB_REF_NAME}"
-            echo "Expected examples: v3, v3.1, v3.1.0"
+          high_medium_count="$(
+            jq '[
+              .site[].alerts[]?
+              | select(
+                  (.riskdesc | startswith("High"))
+                  or
+                  (.riskdesc | startswith("Medium"))
+                )
+            ] | length' \
+              zap-reports/zap-report.json
+          )"
+
+          echo "ZAP exit code: ${zap_exit_code}"
+          echo "High or Medium findings: ${high_medium_count}"
+
+          if [ "${zap_exit_code}" -gt 2 ]; then
+            echo "ZAP encountered an execution error."
             exit 1
           fi
 
-          echo "Release tag: ${GITHUB_REF_NAME}"
-          echo "Commit SHA: ${GITHUB_SHA}"
+          if [ "${high_medium_count}" -gt 0 ]; then
+            echo "ZAP found High or Medium security findings."
+            exit 1
+          fi
+
+          echo "ZAP security gate passed."
+
+      - name: Upload ZAP reports
+        if: ${{ always() }}
+        uses: actions/upload-artifact@v4
+        with:
+          name: zap-baseline-${{ github.sha }}
+          path: zap-reports/
+          if-no-files-found: warn
+          retention-days: 14
 
       - name: Authenticate to Google Cloud
         uses: google-github-actions/auth@v3
@@ -54,33 +178,20 @@ jobs:
       - name: Set up Google Cloud CLI
         uses: google-github-actions/setup-gcloud@v3
 
-      - name: Configure Docker for Artifact Registry
+      - name: Configure Artifact Registry authentication
         shell: bash
         run: |
           set -euo pipefail
 
-          gcloud auth configure-docker             "${{ vars.GAR_LOCATION }}-docker.pkg.dev"             --quiet
+          gcloud auth configure-docker \
+            "${{ vars.GAR_LOCATION }}-docker.pkg.dev" \
+            --quiet
 
-      - name: Build application image
+      - name: Push ZAP-approved image
         shell: bash
         run: |
           set -euo pipefail
-
-          docker build             --pull             --tag "${IMAGE}:${GITHUB_SHA}"             --tag "${IMAGE}:${GITHUB_REF_NAME}"             .
-
-      - name: Push immutable commit image
-        shell: bash
-        run: |
-          set -euo pipefail
-
           docker push "${IMAGE}:${GITHUB_SHA}"
-
-      - name: Push release image
-        shell: bash
-        run: |
-          set -euo pipefail
-
-          docker push "${IMAGE}:${GITHUB_REF_NAME}"
 
       - name: Get GKE credentials
         uses: google-github-actions/get-gke-credentials@v3
@@ -89,50 +200,41 @@ jobs:
           location: ${{ vars.GKE_LOCATION }}
           project_id: ${{ vars.GCP_PROJECT_ID }}
 
-      - name: Confirm target Deployment exists
+      - name: Confirm target Deployment
         shell: bash
         run: |
           set -euo pipefail
 
-          kubectl get deployment student-registration             --namespace="${{ vars.K8S_NAMESPACE }}"
+          kubectl get deployment student-registration \
+            --namespace="${{ vars.K8S_NAMESPACE }}"
 
-      - name: Deploy immutable commit image
+      - name: Deploy ZAP-approved image
         shell: bash
         run: |
           set -euo pipefail
 
-          kubectl set image             deployment/student-registration             application="${IMAGE}:${GITHUB_SHA}"             --namespace="${{ vars.K8S_NAMESPACE }}"
+          kubectl set image \
+            deployment/student-registration \
+            application="${IMAGE}:${GITHUB_SHA}" \
+            --namespace="${{ vars.K8S_NAMESPACE }}"
 
-      - name: Wait for rollout
+          kubectl rollout status \
+            deployment/student-registration \
+            --namespace="${{ vars.K8S_NAMESPACE }}" \
+            --timeout=600s
+
+          kubectl get deployment,replicaset,pods \
+            --namespace="${{ vars.K8S_NAMESPACE }}" \
+            -o wide
+
+      - name: Display candidate logs after failure
+        if: ${{ failure() }}
         shell: bash
         run: |
-          set -euo pipefail
+          docker logs candidate || true
 
-          if ! kubectl rollout status             deployment/student-registration             --namespace="${{ vars.K8S_NAMESPACE }}"             --timeout=600s; then
-
-            echo "Rollout failed. Displaying diagnostics."
-
-            kubectl get pods               --namespace="${{ vars.K8S_NAMESPACE }}"               -o wide
-
-            kubectl describe deployment student-registration               --namespace="${{ vars.K8S_NAMESPACE }}"
-
-            kubectl logs               deployment/student-registration               --namespace="${{ vars.K8S_NAMESPACE }}"               --container=application               --tail=100 || true
-
-            kubectl logs               deployment/student-registration               --namespace="${{ vars.K8S_NAMESPACE }}"               --container=cloud-sql-auth-proxy               --tail=100 || true
-
-            exit 1
-          fi
-
-      - name: Display deployed release
+      - name: Clean up candidate container
+        if: ${{ always() }}
         shell: bash
         run: |
-          set -euo pipefail
-
-          echo "Release tag: ${GITHUB_REF_NAME}"
-          echo "Commit SHA: ${GITHUB_SHA}"
-
-          echo -n "Deployed image: "
-
-          kubectl get deployment student-registration             --namespace="${{ vars.K8S_NAMESPACE }}"             -o jsonpath='{.spec.template.spec.containers[?(@.name=="application")].image}'
-
-          echo
+          docker rm -f candidate || true

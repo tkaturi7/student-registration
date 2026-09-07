@@ -1,0 +1,8 @@
+node_modules/
+.env
+zap-reports/
+terraform/.terraform/
+terraform/*.tfstate
+terraform/*.tfstate.*
+terraform/*.tfplan
+terraform/terraform.tfvars
